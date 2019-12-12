@@ -80,6 +80,7 @@ func getK8sMasterVars(cs *api.ContainerService) (map[string]interface{}, error) 
 	hasAgentPool := len(profiles) > 0
 	hasCosmosEtcd := masterProfile != nil && masterProfile.HasCosmosEtcd()
 	isIPv6DualStackFeatureEnabled := cs.Properties.FeatureFlags.IsFeatureEnabled("EnableIPv6DualStack")
+	isIPv6Enabled := cs.Properties.FeatureFlags.IsFeatureEnabled("EnableIPv6Only") || isIPv6DualStackFeatureEnabled
 
 	kubernetesVersion := orchProfile.OrchestratorVersion
 	if cs.Properties.IsAzureStackCloud() {
@@ -137,6 +138,7 @@ func getK8sMasterVars(cs *api.ContainerService) (map[string]interface{}, error) 
 		"' KMS_PROVIDER_VAULT_NAME=',variables('clusterKeyVaultName')," +
 		"' IS_HOSTED_MASTER=%t" +
 		" IS_IPV6_DUALSTACK_FEATURE_ENABLED=%t" +
+		" IS_IPV6_ENABLED=%t" +
 		" AUTHENTICATION_METHOD=',variables('customCloudAuthenticationMethod')," +
 		"' IDENTITY_SYSTEM=',variables('customCloudIdentifySystem')," +
 		"' NETWORK_API_VERSION=',variables('apiVersionNetwork')," +
@@ -174,7 +176,7 @@ func getK8sMasterVars(cs *api.ContainerService) (map[string]interface{}, error) 
 		"routeTableID":                              "[resourceId('Microsoft.Network/routeTables', variables('routeTableName'))]",
 		"sshNatPorts":                               []int{22, 2201, 2202, 2203, 2204},
 		"sshKeyPath":                                "[concat('/home/',parameters('linuxAdminUsername'),'/.ssh/authorized_keys')]",
-		"provisionScriptParametersCommon":           fmt.Sprintf(provisionScriptParametersCommonString, kubernetesVersion, isHostedMaster, isIPv6DualStackFeatureEnabled),
+		"provisionScriptParametersCommon":           fmt.Sprintf(provisionScriptParametersCommonString, kubernetesVersion, isHostedMaster, isIPv6DualStackFeatureEnabled, isIPv6Enabled),
 		"orchestratorNameVersionTag":                fmt.Sprintf("%s:%s", orchProfile.OrchestratorType, orchProfile.OrchestratorVersion),
 		"subnetNameResourceSegmentIndex":            10,
 		"vnetNameResourceSegmentIndex":              8,

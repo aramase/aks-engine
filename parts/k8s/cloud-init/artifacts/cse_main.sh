@@ -172,7 +172,7 @@ fi
 {{end}}
 
 {{/* configure and enable dhcpv6 for dual stack feature */}}
-{{- if IsIPv6DualStackFeatureEnabled}}
+{{- if IsIPv6Enabled}}
 ensureDHCPv6
 {{end}}
 
