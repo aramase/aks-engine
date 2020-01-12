@@ -171,7 +171,7 @@ if [[ -n "${MASTER_NODE}" && "${KMS_PROVIDER_VAULT_NAME}" != "" ]]; then
 fi
 {{end}}
 
-{{/* configure and enable dhcpv6 for dual stack feature */}}
+{{/* configure and enable dhcpv6 for ipv6 features */}}
 {{- if IsIPv6Enabled}}
 ensureDHCPv6
 {{end}}

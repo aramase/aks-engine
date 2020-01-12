@@ -66,6 +66,11 @@ func CreateNetworkInterfaces(cs *api.ContainerService) NetworkInterfaceARM {
 		},
 	}
 
+	// set primary nic type to ipv6 for ipv6 only cluster
+	if cs.Properties.FeatureFlags.IsFeatureEnabled("EnableIPv6Only") {
+		loadBalancerIPConfig.InterfaceIPConfigurationPropertiesFormat.PrivateIPAddressVersion = "IPv6"
+	}
+
 	if !cs.Properties.OrchestratorProfile.IsPrivateCluster() {
 		publicNatRules := []network.InboundNatRule{
 			{

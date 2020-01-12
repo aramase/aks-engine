@@ -2076,6 +2076,8 @@ func (f *FeatureFlags) IsFeatureEnabled(feature string) bool {
 			return f.EnableIPv6DualStack
 		case "EnableTelemetry":
 			return f.EnableTelemetry
+		case "EnableIPv6Only":
+			return f.EnableIPv6Only
 		default:
 			return false
 		}
