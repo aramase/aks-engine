@@ -229,7 +229,7 @@ func (a *Properties) ValidateOrchestratorProfile(isUpdate bool) error {
 			}
 
 			if o.KubernetesConfig != nil {
-				err := o.KubernetesConfig.Validate(version, a.HasWindows(), a.FeatureFlags.IsIPv6DualStackEnabled())
+				err := o.KubernetesConfig.Validate(version, a.HasWindows(), a.FeatureFlags.IsIPv6DualStackEnabled(), a.FeatureFlags.IsIPv6OnlyEnabled())
 				if err != nil {
 					return err
 				}
@@ -383,9 +383,9 @@ func (a *Properties) validateMasterProfile(isUpdate bool) error {
 			return errors.New("when masterProfile's availabilityProfile is VirtualMachineScaleSets and a vnetSubnetID is specified, the firstConsecutiveStaticIP should be empty and will be determined by an offset from the first IP in the vnetCidr")
 		}
 		// validate os type is linux if dual stack feature is enabled
-		if a.FeatureFlags.IsIPv6DualStackEnabled() {
+		if a.FeatureFlags.IsIPv6DualStackEnabled() || a.FeatureFlags.IsIPv6OnlyEnabled() {
 			if m.Distro == CoreOS {
-				return errors.Errorf("Dual stack feature is currently supported only with Ubuntu, but master is of distro type %s", m.Distro)
+				return errors.Errorf("Dual stack and single stack IPv6 feature is currently supported only with Ubuntu, but master is of distro type %s", m.Distro)
 			}
 		}
 	}
@@ -450,12 +450,12 @@ func (a *Properties) validateAgentPoolProfiles(isUpdate bool) error {
 		}
 
 		// validate os type is linux if dual stack feature is enabled
-		if a.FeatureFlags.IsIPv6DualStackEnabled() {
+		if a.FeatureFlags.IsIPv6DualStackEnabled() || a.FeatureFlags.IsIPv6OnlyEnabled() {
 			if agentPoolProfile.OSType == Windows {
-				return errors.Errorf("Dual stack feature is supported only with Linux, but agent pool '%s' is of os type %s", agentPoolProfile.Name, agentPoolProfile.OSType)
+				return errors.Errorf("Dual stack and single stack IPv6 feature is supported only with Linux, but agent pool '%s' is of os type %s", agentPoolProfile.Name, agentPoolProfile.OSType)
 			}
 			if agentPoolProfile.Distro == CoreOS {
-				return errors.Errorf("Dual stack feature is currently supported only with Ubuntu, but agent pool '%s' is of distro type %s", agentPoolProfile.Name, agentPoolProfile.Distro)
+				return errors.Errorf("Dual stack and single stack IPv6 feature is currently supported only with Ubuntu, but agent pool '%s' is of distro type %s", agentPoolProfile.Name, agentPoolProfile.Distro)
 			}
 		}
 
@@ -1229,7 +1229,7 @@ func validatePasswordComplexity(name string, password string) (out bool) {
 }
 
 // Validate validates the KubernetesConfig
-func (k *KubernetesConfig) Validate(k8sVersion string, hasWindows, ipv6DualStackEnabled bool) error {
+func (k *KubernetesConfig) Validate(k8sVersion string, hasWindows, ipv6DualStackEnabled, isIPv6 bool) error {
 	// number of minimum retries allowed for kubelet to post node status
 	const minKubeletRetries = 4
 
@@ -1248,6 +1248,24 @@ func (k *KubernetesConfig) Validate(k8sVersion string, hasWindows, ipv6DualStack
 		// ipv6 dual stack feature is currently only supported with kubenet
 		if k.NetworkPlugin != "kubenet" {
 			return errors.Errorf("OrchestratorProfile.KubernetesConfig.NetworkPlugin '%s' is invalid. IPv6 dual stack supported only with kubenet.", k.NetworkPlugin)
+		}
+	}
+
+	if isIPv6 {
+		sv, err := semver.Make(k8sVersion)
+		if err != nil {
+			return errors.Errorf("could not validate version %s", k8sVersion)
+		}
+		minVersion, err := semver.Make("1.17.0")
+		if err != nil {
+			return errors.New("could not validate version")
+		}
+		if sv.LT(minVersion) {
+			return errors.Errorf("IPv6 single stack not available in kubernetes version %s", k8sVersion)
+		}
+		// single stack IPv6 feature is currently only supported with kubenet
+		if k.NetworkPlugin != "kubenet" {
+			return errors.Errorf("OrchestratorProfile.KubernetesConfig.NetworkPlugin '%s' is invalid. IPv6 single stack supported only with kubenet.", k.NetworkPlugin)
 		}
 	}
 
