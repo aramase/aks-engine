@@ -25528,6 +25528,15 @@ data:
       kubeconfig: /var/lib/kubelet/kubeconfig
     clusterCIDR: "{{ContainerConfig "cluster-cidr"}}"
     mode: "{{ContainerConfig "proxy-mode"}}"
+    {{- if ContainerConfig "bind-address"}}
+    bindAddress: "{{ContainerConfig "bind-address"}}"
+    {{end}}
+    {{- if ContainerConfig "healthz-bind-address"}}
+    healthzBindAddress: "{{ContainerConfig "healthz-bind-address"}}"
+    {{end}}
+    {{- if ContainerConfig "metrics-bind-address"}}
+    metricsBindAddress: "{{ContainerConfig "metrics-bind-address"}}"
+    {{end}}
     featureGates:
       {{ContainerConfig "featureGates"}}
 metadata:
@@ -29036,7 +29045,7 @@ spec:
       nodeSelector:
         beta.kubernetes.io/os: linux
         {{- if ContainerConfig "use-host-network"}}
-        kubernetes.io/role: agent
+        kubernetes.azure.com/role: agent
         {{end}}
       containers:
       - name: coredns
