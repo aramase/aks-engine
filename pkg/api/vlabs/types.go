@@ -60,6 +60,7 @@ type FeatureFlags struct {
 	EnableTelemetry          bool `json:"enableTelemetry,omitempty"`
 	EnableIPv6Only           bool `json:"enableIPv6Only,omitempty"`
 	EnableWinDSR             bool `json:"enableWinDSR,omitempty"`
+	EnableLondon             bool `json:"enableLondon,omitempty"`
 }
 
 // ServicePrincipalProfile contains the client and secret used by the cluster for Azure Resource CRUD
@@ -364,6 +365,7 @@ type KubernetesConfig struct {
 	GCHighThreshold                     int                   `json:"gchighthreshold,omitempty"`
 	GCLowThreshold                      int                   `json:"gclowthreshold,omitempty"`
 	EtcdVersion                         string                `json:"etcdVersion,omitempty"`
+	LondonImage                         string                `json:"londonImage,omitempty"`
 	EtcdDiskSizeGB                      string                `json:"etcdDiskSizeGB,omitempty"`
 	EtcdStorageLimitGB                  int                   `json:"etcdStorageLimitGB,omitempty"`
 	EtcdEncryptionKey                   string                `json:"etcdEncryptionKey,omitempty"`
@@ -406,6 +408,9 @@ type KubernetesConfig struct {
 	MicrosoftAptRepositoryURL           string                `json:"microsoftAptRepositoryURL,omitempty"`
 	EnableMultipleStandardLoadBalancers *bool                 `json:"enableMultipleStandardLoadBalancers,omitempty"`
 	Tags                                string                `json:"tags,omitempty"`
+	StorageAccountName                  string                `json:"storageAccountName,omitempty"`
+	StorageAccountKey                   string                `json:"storageAccountKey,omitempty"`
+	StorageTableName                    string                `json:"storageTableName,omitempty"`
 }
 
 // CustomFile has source as the full absolute source path to a file and dest
@@ -996,4 +1001,9 @@ func (f *FeatureFlags) IsIPv6OnlyEnabled() bool {
 // IsWinDSREnabled checks if WinDSR feature is enabled
 func (f *FeatureFlags) IsWinDSREnabled() bool {
 	return f != nil && f.EnableWinDSR
+}
+
+// IsLondonEnabled checks if london feature is enabled
+func (f *FeatureFlags) IsLondonEnabled() bool {
+	return f != nil && f.EnableLondon
 }

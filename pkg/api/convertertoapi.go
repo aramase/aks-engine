@@ -120,6 +120,7 @@ func convertVLabsFeatureFlags(vlabs *vlabs.FeatureFlags, api *FeatureFlags) {
 	api.EnableTelemetry = vlabs.EnableTelemetry
 	api.EnableIPv6Only = vlabs.EnableIPv6Only
 	api.EnableWinDSR = vlabs.EnableWinDSR
+	api.EnableLondon = vlabs.EnableLondon
 }
 
 func convertVLabsExtensionProfile(vlabs *vlabs.ExtensionProfile, api *ExtensionProfile) {
@@ -302,6 +303,7 @@ func convertVLabsKubernetesConfig(vlabs *vlabs.KubernetesConfig, api *Kubernetes
 	api.GCHighThreshold = vlabs.GCHighThreshold
 	api.GCLowThreshold = vlabs.GCLowThreshold
 	api.EtcdVersion = vlabs.EtcdVersion
+	api.LondonImage = vlabs.LondonImage
 	api.EtcdDiskSizeGB = vlabs.EtcdDiskSizeGB
 	api.EtcdStorageLimitGB = vlabs.EtcdStorageLimitGB
 	api.EtcdEncryptionKey = vlabs.EtcdEncryptionKey
@@ -318,6 +320,9 @@ func convertVLabsKubernetesConfig(vlabs *vlabs.KubernetesConfig, api *Kubernetes
 	api.MicrosoftAptRepositoryURL = vlabs.MicrosoftAptRepositoryURL
 	api.EnableMultipleStandardLoadBalancers = vlabs.EnableMultipleStandardLoadBalancers
 	api.Tags = vlabs.Tags
+	api.StorageAccountName = vlabs.StorageAccountName
+	api.StorageAccountKey = vlabs.StorageAccountKey
+	api.StorageTableName = vlabs.StorageTableName
 	convertComponentsToAPI(vlabs, api)
 	convertAddonsToAPI(vlabs, api)
 	convertKubeletConfigToAPI(vlabs, api)

@@ -32,6 +32,15 @@ installEtcd() {
     chmod a+x "$path/etcd" "$path/etcdctl"
   fi
 }
+installLondon() {
+  local cli_tool=$1 path="/usr/bin" image=${LONDON_IMAGE}
+  pullContainerImage $cli_tool ${image}
+  if [[ $cli_tool == "docker" ]]; then
+    mkdir -p "$path"
+    docker run --rm --entrypoint cat ${image} /bin/london >"$path/london"
+  fi
+  chmod a+x "$path/london" "$path/london"
+}
 installDeps() {
   packages="apache2-utils apt-transport-https blobfuse=1.1.1 ca-certificates cifs-utils conntrack cracklib-runtime dbus dkms ebtables ethtool fuse gcc git htop iftop init-system-helpers iotop iproute2 ipset iptables jq libpam-pwquality libpwquality-tools linux-headers-$(uname -r) make mount nfs-common pigz socat sysstat traceroute util-linux xz-utils zip"
   if [[ ${OS} == "${UBUNTU_OS_NAME}" ]]; then

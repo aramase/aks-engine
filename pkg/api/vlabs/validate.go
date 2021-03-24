@@ -225,7 +225,7 @@ func (a *Properties) ValidateOrchestratorProfile(isUpdate bool) error {
 		}
 
 		if o.KubernetesConfig != nil {
-			err := o.KubernetesConfig.Validate(version, a.HasWindows(), a.FeatureFlags.IsIPv6DualStackEnabled(), a.FeatureFlags.IsIPv6OnlyEnabled(), isUpdate)
+			err := o.KubernetesConfig.Validate(version, a.HasWindows(), a.FeatureFlags.IsIPv6DualStackEnabled(), a.FeatureFlags.IsIPv6OnlyEnabled(), a.FeatureFlags.IsLondonEnabled(), isUpdate)
 			if err != nil {
 				return err
 			}
@@ -1224,7 +1224,7 @@ func validatePasswordComplexity(name string, password string) (out bool) {
 }
 
 // Validate validates the KubernetesConfig
-func (k *KubernetesConfig) Validate(k8sVersion string, hasWindows, ipv6DualStackEnabled, isIPv6, isUpdate bool) error {
+func (k *KubernetesConfig) Validate(k8sVersion string, hasWindows, ipv6DualStackEnabled, isIPv6, isLondon, isUpdate bool) error {
 	// number of minimum retries allowed for kubelet to post node status
 	const minKubeletRetries = 4
 
@@ -1483,6 +1483,14 @@ func (k *KubernetesConfig) Validate(k8sVersion string, hasWindows, ipv6DualStack
 	if k.Tags != "" && !common.IsKubernetesVersionGe(k8sVersion, "1.20.0-beta.1") {
 		return errors.Errorf("OrchestratorProfile.KubernetesConfig.Tags is available since kubernetes version v1.20.0-beta.1, current version is %s", k8sVersion)
 	}
+
+	// validate london required config
+	if isLondon {
+		if k.StorageAccountName == "" || k.StorageAccountKey == "" || k.StorageTableName == "" {
+			return errors.Errorf("StorageAccountName, StorageAccountKey and StorageTableName are required to enable london")
+		}
+	}
+
 	return k.validateContainerRuntimeConfig()
 }
 

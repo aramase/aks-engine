@@ -33,6 +33,20 @@ systemctlEtcd() {
     return 1
   fi
 }
+systemctlLondon() {
+  for i in $(seq 1 60); do
+    timeout 30 systemctl daemon-reload
+    timeout 30 systemctl restart london && break ||
+      if [ $i -eq 60 ]; then
+        return 1
+      else
+        sleep 5
+      fi
+  done
+  if ! retrycmd 120 5 25 systemctl enable london; then
+    return 1
+  fi
+}
 configureAdminUser(){
   chage -E -1 -I -1 -m 0 -M 99999 "${ADMINUSER}"
   chage -l "${ADMINUSER}"
@@ -107,6 +121,28 @@ configureEtcd() {
   done
   retrycmd 120 5 25 sudo -E etcdctl member update $MEMBER ${etcd_peer_url} || exit {{GetCSEErrorCode "ERR_ETCD_CONFIG_FAIL"}}
 }
+configureLondon() {
+  set -x
+
+  local ret f=/opt/azure/containers/setup-etcd.sh etcd_peer_url="https://${PRIVATE_IP}:2380"
+  wait_for_file 1200 1 $f || exit {{GetCSEErrorCode "ERR_ETCD_CONFIG_FAIL"}}
+  $f >/opt/azure/containers/setup-etcd.log 2>&1
+  ret=$?
+  if [ $ret -ne 0 ]; then
+    exit $ret
+  fi
+
+  if [[ -z ${ETCDCTL_ENDPOINTS} ]]; then
+    {{/* Variables necessary for etcdctl are not present */}}
+    {{/* Must pull them from /etc/environment */}}
+    for entry in $(cat /etc/environment); do
+      export ${entry}
+    done
+  fi
+
+  systemctlLondon || exit {{GetCSEErrorCode "ERR_ETCD_START_TIMEOUT"}}
+}
+
 configureChrony() {
   sed -i "s/makestep.*/makestep 1.0 -1/g" /etc/chrony/chrony.conf
   echo "refclock PHC /dev/ptp0 poll 3 dpoll -2 offset 0" >> /etc/chrony/chrony.conf

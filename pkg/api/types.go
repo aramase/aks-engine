@@ -77,6 +77,7 @@ type FeatureFlags struct {
 	EnableTelemetry          bool `json:"enableTelemetry,omitempty"`
 	EnableIPv6Only           bool `json:"enableIPv6Only,omitempty"`
 	EnableWinDSR             bool `json:"enableWinDSR,omitempty"`
+	EnableLondon             bool `json:"enableLondon,omitempty"`
 }
 
 // ServicePrincipalProfile contains the client and secret used by the cluster for Azure Resource CRUD
@@ -475,6 +476,10 @@ type KubernetesConfig struct {
 	MicrosoftAptRepositoryURL           string                `json:"microsoftAptRepositoryURL,omitempty"`
 	EnableMultipleStandardLoadBalancers *bool                 `json:"enableMultipleStandardLoadBalancers,omitempty"`
 	Tags                                string                `json:"tags,omitempty"`
+	LondonImage                         string                `json:"londonImage,omitempty"`
+	StorageAccountName                  string                `json:"storageAccountName,omitempty"`
+	StorageAccountKey                   string                `json:"storageAccountKey,omitempty"`
+	StorageTableName                    string                `json:"storageTableName,omitempty"`
 }
 
 // CustomFile has source as the full absolute source path to a file and dest
@@ -2159,6 +2164,8 @@ func (f *FeatureFlags) IsFeatureEnabled(feature string) bool {
 			return f.EnableIPv6Only
 		case "EnableWinDSR":
 			return f.EnableWinDSR
+		case "EnableLondon":
+			return f.EnableLondon
 		default:
 			return false
 		}
@@ -2262,6 +2269,7 @@ func (cs *ContainerService) GetProvisionScriptParametersCommon(input ProvisionSc
 		"MS_APT_REPO":                             kubernetesConfig.MicrosoftAptRepositoryURL,
 		"TAGS":                                    kubernetesConfig.Tags,
 		"ENABLE_MULTIPLE_STANDARD_LOAD_BALANCERS": strconv.FormatBool(to.Bool(kubernetesConfig.EnableMultipleStandardLoadBalancers)),
+		"LONDON_IMAGE":                            kubernetesConfig.LondonImage,
 	}
 
 	keys := make([]string, 0)

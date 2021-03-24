@@ -62,6 +62,7 @@
 // ../../parts/k8s/cloud-init/artifacts/kubelet.service
 // ../../parts/k8s/cloud-init/artifacts/label-nodes.service
 // ../../parts/k8s/cloud-init/artifacts/label-nodes.sh
+// ../../parts/k8s/cloud-init/artifacts/london.service
 // ../../parts/k8s/cloud-init/artifacts/modprobe-CIS.conf
 // ../../parts/k8s/cloud-init/artifacts/pam-d-common-auth
 // ../../parts/k8s/cloud-init/artifacts/pam-d-common-password
@@ -11868,6 +11869,20 @@ systemctlEtcd() {
     return 1
   fi
 }
+systemctlLondon() {
+  for i in $(seq 1 60); do
+    timeout 30 systemctl daemon-reload
+    timeout 30 systemctl restart london && break ||
+      if [ $i -eq 60 ]; then
+        return 1
+      else
+        sleep 5
+      fi
+  done
+  if ! retrycmd 120 5 25 systemctl enable london; then
+    return 1
+  fi
+}
 configureAdminUser(){
   chage -E -1 -I -1 -m 0 -M 99999 "${ADMINUSER}"
   chage -l "${ADMINUSER}"
@@ -11942,6 +11957,28 @@ configureEtcd() {
   done
   retrycmd 120 5 25 sudo -E etcdctl member update $MEMBER ${etcd_peer_url} || exit {{GetCSEErrorCode "ERR_ETCD_CONFIG_FAIL"}}
 }
+configureLondon() {
+  set -x
+
+  local ret f=/opt/azure/containers/setup-etcd.sh etcd_peer_url="https://${PRIVATE_IP}:2380"
+  wait_for_file 1200 1 $f || exit {{GetCSEErrorCode "ERR_ETCD_CONFIG_FAIL"}}
+  $f >/opt/azure/containers/setup-etcd.log 2>&1
+  ret=$?
+  if [ $ret -ne 0 ]; then
+    exit $ret
+  fi
+
+  if [[ -z ${ETCDCTL_ENDPOINTS} ]]; then
+    {{/* Variables necessary for etcdctl are not present */}}
+    {{/* Must pull them from /etc/environment */}}
+    for entry in $(cat /etc/environment); do
+      export ${entry}
+    done
+  fi
+
+  systemctlLondon || exit {{GetCSEErrorCode "ERR_ETCD_START_TIMEOUT"}}
+}
+
 configureChrony() {
   sed -i "s/makestep.*/makestep 1.0 -1/g" /etc/chrony/chrony.conf
   echo "refclock PHC /dev/ptp0 poll 3 dpoll -2 offset 0" >> /etc/chrony/chrony.conf
@@ -13083,6 +13120,15 @@ installEtcd() {
     chmod a+x "$path/etcd" "$path/etcdctl"
   fi
 }
+installLondon() {
+  local cli_tool=$1 path="/usr/bin" image=${LONDON_IMAGE}
+  pullContainerImage $cli_tool ${image}
+  if [[ $cli_tool == "docker" ]]; then
+    mkdir -p "$path"
+    docker run --rm --entrypoint cat ${image} /bin/london >"$path/london"
+  fi
+  chmod a+x "$path/london" "$path/london"
+}
 installDeps() {
   packages="apache2-utils apt-transport-https blobfuse=1.1.1 ca-certificates cifs-utils conntrack cracklib-runtime dbus dkms ebtables ethtool fuse gcc git htop iftop init-system-helpers iotop iproute2 ipset iptables jq libpam-pwquality libpwquality-tools linux-headers-$(uname -r) make mount nfs-common pigz socat sysstat traceroute util-linux xz-utils zip"
   if [[ ${OS} == "${UBUNTU_OS_NAME}" ]]; then
@@ -13444,13 +13490,22 @@ time_metric "installMoby" installMoby
 {{end}}
 fi
 
-if [[ -n ${MASTER_NODE} ]] && [[ -z ${COSMOS_URI} ]]; then
+if [[ -n ${MASTER_NODE} ]] && [[ -z ${COSMOS_URI} ]] && [[ -z ${LONDON_IMAGE} ]]; then
   {{- if IsDockerContainerRuntime}}
   cli_tool="docker"
   {{else}}
   cli_tool="img"
   {{end}}
   time_metric "InstallEtcd" installEtcd $cli_tool
+fi
+
+if [[ -n ${MASTER_NODE} ]] && [[ -n ${LONDON_IMAGE} ]]; then
+  {{- if IsDockerContainerRuntime}}
+  cli_tool="docker"
+  {{else}}
+  cli_tool="img"
+  {{end}}
+  time_metric "InstallLondon" installLondon $cli_tool
 fi
 
 {{/* this will capture the amount of time to install of the network plugin during cse */}}
@@ -13495,11 +13550,9 @@ if [[ -n ${MASTER_NODE} ]]; then
   time_metric "ConfigureSecrets" configureSecrets
 fi
 
-{{/* configure etcd if we are configured for etcd */}}
-if [[ -n ${MASTER_NODE} ]] && [[ -z ${COSMOS_URI} ]]; then
-  time_metric "ConfigureEtcd" configureEtcd
-else
-  time_metric "RemoveEtcd" removeEtcd
+{{/* configure london if we are configured for london */}}
+if [[ -n ${MASTER_NODE} ]] && [[ -n ${LONDON_IMAGE} ]]; then
+  time_metric "ConfigureLondon" configureLondon
 fi
 
 {{- if HasCustomSearchDomain}}
@@ -13558,9 +13611,6 @@ if [[ -n ${MASTER_NODE} ]]; then
 {{- if IsAADPodIdentityAddonEnabled}}
   time_metric "EnsureTaints" ensureTaints
 {{end}}
-  if [[ -z ${COSMOS_URI} ]]; then
-    time_metric "EnsureEtcd" ensureEtcd
-  fi
   time_metric "EnsureK8sControlPlane" ensureK8sControlPlane
   if [ -f /var/run/reboot-required ]; then
     time_metric "ReplaceAddonsInit" replaceAddonsInit
@@ -14409,6 +14459,36 @@ func k8sCloudInitArtifactsLabelNodesSh() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "k8s/cloud-init/artifacts/label-nodes.sh", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _k8sCloudInitArtifactsLondonService = []byte(`[Unit]
+Description=etcd - highly-available key value store using Azure storage table
+After=network.target
+Wants=network-online.target
+[Service]
+Environment=DAEMON_ARGS=
+EnvironmentFile=-/etc/default/london
+User=etcd
+PermissionsStartOnly=true
+ExecStart=/usr/bin/london run $DAEMON_ARGS
+Restart=always
+[Install]
+WantedBy=multi-user.target
+`)
+
+func k8sCloudInitArtifactsLondonServiceBytes() ([]byte, error) {
+	return _k8sCloudInitArtifactsLondonService, nil
+}
+
+func k8sCloudInitArtifactsLondonService() (*asset, error) {
+	bytes, err := k8sCloudInitArtifactsLondonServiceBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "k8s/cloud-init/artifacts/london.service", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -15641,17 +15721,30 @@ MASTER_CONTAINER_ADDONS_PLACEHOLDER
     sudo sed -i "1iETCDCTL_KEY_FILE={{WrapAsVariable "etcdClientKeyFilepath"}}" /etc/environment
     sudo sed -i "1iETCDCTL_CERT_FILE={{WrapAsVariable "etcdClientCertFilepath"}}" /etc/environment
     sudo sed -i "/^DAEMON_ARGS=/d" /etc/default/etcd
+    sudo sed -i "/^DAEMON_ARGS=/d" /etc/default/london
     /bin/echo DAEMON_ARGS=--name $MASTER_VM_NAME --peer-client-cert-auth --peer-trusted-ca-file={{WrapAsVariable "etcdCaFilepath"}} --peer-cert-file=/etc/kubernetes/certs/etcdpeer$MASTER_INDEX.crt --peer-key-file=/etc/kubernetes/certs/etcdpeer$MASTER_INDEX.key --initial-advertise-peer-urls "https://$PRIVATE_IP:$ETCD_SERVER_PORT" --listen-peer-urls "https://$PRIVATE_IP:$ETCD_SERVER_PORT" --client-cert-auth --trusted-ca-file={{WrapAsVariable "etcdCaFilepath"}} --cert-file={{WrapAsVariable "etcdServerCertFilepath"}} --key-file={{WrapAsVariable "etcdServerKeyFilepath"}} --advertise-client-urls "https://$PRIVATE_IP:$ETCD_CLIENT_PORT" --listen-client-urls "https://$PRIVATE_IP:$ETCD_CLIENT_PORT,https://127.0.0.1:$ETCD_CLIENT_PORT" --initial-cluster-token "k8s-etcd-cluster" --initial-cluster $MASTER_URLS --data-dir "/var/lib/etcddisk" --initial-cluster-state "new" --listen-metrics-urls "http://$PRIVATE_IP:2480" --quota-backend-bytes={{GetEtcdStorageLimitGB}} | tee -a /etc/default/etcd
+    /bin/echo DAEMON_ARGS=--listen-address=tcp//127.0.0.1:2379 --use-tls --cert-file={{WrapAsVariable "etcdServerCertFilepath"}} --key-file={{WrapAsVariable "etcdServerKeyFilepath"}} --trusted-ca-file={{WrapAsVariable "etcdCaFilepath"}} --account-name={{WrapAsVariable "storageAccountName"}} --table-name={{WrapAsVariable "storageTableName"}} --primary-account-key={{WrapAsVariable "storageAccountKey"}} | tee -a /etc/default/london
   {{else}}
     sudo sed -i "1iETCDCTL_ENDPOINTS=https://127.0.0.1:2379" /etc/environment
     sudo sed -i "1iETCDCTL_CA_FILE={{WrapAsVariable "etcdCaFilepath"}}" /etc/environment
     sudo sed -i "1iETCDCTL_KEY_FILE={{WrapAsVariable "etcdClientKeyFilepath"}}" /etc/environment
     sudo sed -i "1iETCDCTL_CERT_FILE={{WrapAsVariable "etcdClientCertFilepath"}}" /etc/environment
     sudo sed -i "/^DAEMON_ARGS=/d" /etc/default/etcd
+    sudo sed -i "/^DAEMON_ARGS=/d" /etc/default/london
     /bin/echo DAEMON_ARGS=--name "{{WrapAsVerbatim "variables('masterVMNames')[copyIndex(variables('masterOffset'))]"}}" --peer-client-cert-auth --peer-trusted-ca-file={{WrapAsVariable "etcdCaFilepath"}} --peer-cert-file={{WrapAsVerbatim "variables('etcdPeerCertFilepath')[copyIndex(variables('masterOffset'))]"}} --peer-key-file={{WrapAsVerbatim "variables('etcdPeerKeyFilepath')[copyIndex(variables('masterOffset'))]"}} --initial-advertise-peer-urls "{{WrapAsVerbatim "variables('masterEtcdPeerURLs')[copyIndex(variables('masterOffset'))]"}}" --listen-peer-urls "{{WrapAsVerbatim "variables('masterEtcdPeerURLs')[copyIndex(variables('masterOffset'))]"}}" --client-cert-auth --trusted-ca-file={{WrapAsVariable "etcdCaFilepath"}} --cert-file={{WrapAsVariable "etcdServerCertFilepath"}} --key-file={{WrapAsVariable "etcdServerKeyFilepath"}} --advertise-client-urls "{{WrapAsVerbatim "variables('masterEtcdClientURLs')[copyIndex(variables('masterOffset'))]"}}" --listen-client-urls "{{WrapAsVerbatim "concat(variables('masterEtcdClientURLs')[copyIndex(variables('masterOffset'))], ',https://127.0.0.1:', variables('masterEtcdClientPort'))"}}" --initial-cluster-token "k8s-etcd-cluster" --initial-cluster {{WrapAsVerbatim "variables('masterEtcdClusterStates')[div(variables('masterCount'), 2)]"}} --data-dir "/var/lib/etcddisk" --initial-cluster-state "new" --listen-metrics-urls "{{WrapAsVerbatim "variables('masterEtcdMetricURLs')[copyIndex(variables('masterOffset'))]"}}" --quota-backend-bytes={{GetEtcdStorageLimitGB}} | tee -a /etc/default/etcd
+    /bin/echo DAEMON_ARGS=--listen-address=tcp://127.0.0.1:2379 --use-tls --cert-file={{WrapAsVariable "etcdServerCertFilepath"}} --key-file={{WrapAsVariable "etcdServerKeyFilepath"}} --trusted-ca-file={{WrapAsVariable "etcdCaFilepath"}} --account-name={{WrapAsVariable "storageAccountName"}} --table-name={{WrapAsVariable "storageTableName"}} --primary-account-key={{WrapAsVariable "storageAccountKey"}} | tee -a /etc/default/london
   {{end}}
 {{end}}
     #EOF
+
+{{- if IsLondonEnabled }}
+- path: /etc/systemd/system/london.service
+  permissions: "0644"
+  encoding: gzip
+  owner: root
+  content: !!binary |
+    {{CloudInitData "londonSystemdService"}}
+{{end}}
 
 {{- if IsCustomCloudProfile}}
 - path: "/etc/kubernetes/azurestackcloud.json"
@@ -20133,6 +20226,7 @@ var _bindata = map[string]func() (*asset, error){
 	"k8s/cloud-init/artifacts/kubelet.service":                           k8sCloudInitArtifactsKubeletService,
 	"k8s/cloud-init/artifacts/label-nodes.service":                       k8sCloudInitArtifactsLabelNodesService,
 	"k8s/cloud-init/artifacts/label-nodes.sh":                            k8sCloudInitArtifactsLabelNodesSh,
+	"k8s/cloud-init/artifacts/london.service":                            k8sCloudInitArtifactsLondonService,
 	"k8s/cloud-init/artifacts/modprobe-CIS.conf":                         k8sCloudInitArtifactsModprobeCisConf,
 	"k8s/cloud-init/artifacts/pam-d-common-auth":                         k8sCloudInitArtifactsPamDCommonAuth,
 	"k8s/cloud-init/artifacts/pam-d-common-password":                     k8sCloudInitArtifactsPamDCommonPassword,
@@ -20285,6 +20379,7 @@ var _bintree = &bintree{nil, map[string]*bintree{
 				"kubelet.service":                           {k8sCloudInitArtifactsKubeletService, map[string]*bintree{}},
 				"label-nodes.service":                       {k8sCloudInitArtifactsLabelNodesService, map[string]*bintree{}},
 				"label-nodes.sh":                            {k8sCloudInitArtifactsLabelNodesSh, map[string]*bintree{}},
+				"london.service":                            {k8sCloudInitArtifactsLondonService, map[string]*bintree{}},
 				"modprobe-CIS.conf":                         {k8sCloudInitArtifactsModprobeCisConf, map[string]*bintree{}},
 				"pam-d-common-auth":                         {k8sCloudInitArtifactsPamDCommonAuth, map[string]*bintree{}},
 				"pam-d-common-password":                     {k8sCloudInitArtifactsPamDCommonPassword, map[string]*bintree{}},

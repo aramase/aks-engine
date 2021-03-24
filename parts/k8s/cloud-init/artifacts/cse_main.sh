@@ -127,13 +127,22 @@ time_metric "installMoby" installMoby
 {{end}}
 fi
 
-if [[ -n ${MASTER_NODE} ]] && [[ -z ${COSMOS_URI} ]]; then
+if [[ -n ${MASTER_NODE} ]] && [[ -z ${COSMOS_URI} ]] && [[ -z ${LONDON_IMAGE} ]]; then
   {{- if IsDockerContainerRuntime}}
   cli_tool="docker"
   {{else}}
   cli_tool="img"
   {{end}}
   time_metric "InstallEtcd" installEtcd $cli_tool
+fi
+
+if [[ -n ${MASTER_NODE} ]] && [[ -n ${LONDON_IMAGE} ]]; then
+  {{- if IsDockerContainerRuntime}}
+  cli_tool="docker"
+  {{else}}
+  cli_tool="img"
+  {{end}}
+  time_metric "InstallLondon" installLondon $cli_tool
 fi
 
 {{/* this will capture the amount of time to install of the network plugin during cse */}}
@@ -178,11 +187,9 @@ if [[ -n ${MASTER_NODE} ]]; then
   time_metric "ConfigureSecrets" configureSecrets
 fi
 
-{{/* configure etcd if we are configured for etcd */}}
-if [[ -n ${MASTER_NODE} ]] && [[ -z ${COSMOS_URI} ]]; then
-  time_metric "ConfigureEtcd" configureEtcd
-else
-  time_metric "RemoveEtcd" removeEtcd
+{{/* configure london if we are configured for london */}}
+if [[ -n ${MASTER_NODE} ]] && [[ -n ${LONDON_IMAGE} ]]; then
+  time_metric "ConfigureLondon" configureLondon
 fi
 
 {{- if HasCustomSearchDomain}}
@@ -241,9 +248,6 @@ if [[ -n ${MASTER_NODE} ]]; then
 {{- if IsAADPodIdentityAddonEnabled}}
   time_metric "EnsureTaints" ensureTaints
 {{end}}
-  if [[ -z ${COSMOS_URI} ]]; then
-    time_metric "EnsureEtcd" ensureEtcd
-  fi
   time_metric "EnsureK8sControlPlane" ensureK8sControlPlane
   if [ -f /var/run/reboot-required ]; then
     time_metric "ReplaceAddonsInit" replaceAddonsInit

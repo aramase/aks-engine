@@ -155,6 +155,7 @@ func getK8sMasterVars(cs *api.ContainerService) (map[string]interface{}, error) 
 		"healthMonitorScript":          getBase64EncodedGzippedCustomScript(kubernetesHealthMonitorScript, cs),
 		"kubeletMonitorSystemdService": getBase64EncodedGzippedCustomScript(kubernetesKubeletMonitorSystemdService, cs),
 		"dockerMonitorSystemdService":  getBase64EncodedGzippedCustomScript(kubernetesDockerMonitorSystemdService, cs),
+		"londonSystemdService":         getBase64EncodedGzippedCustomScript(londonSystemdService, cs),
 	}
 
 	if enableEncryptionWithExternalKms {
@@ -308,6 +309,10 @@ func getK8sMasterVars(cs *api.ContainerService) (map[string]interface{}, error) 
 		masterVars["servicePrincipalClientId"] = "[parameters('servicePrincipalClientId')]"
 		masterVars["servicePrincipalClientSecret"] = "[parameters('servicePrincipalClientSecret')]"
 	}
+
+	masterVars["storageAccountName"] = kubernetesConfig.StorageAccountName
+	masterVars["storageAccountKey"] = kubernetesConfig.StorageAccountKey
+	masterVars["storageTableName"] = kubernetesConfig.StorageTableName
 
 	masterVars["masterCount"] = masterProfile.Count
 	if isMasterVMSS {
