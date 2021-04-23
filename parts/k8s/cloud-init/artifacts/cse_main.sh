@@ -127,7 +127,8 @@ time_metric "installMoby" installMoby
 {{end}}
 fi
 
-if [[ -n ${MASTER_NODE} ]] && [[ -z ${COSMOS_URI} ]] && [[ -z ${LONDON_IMAGE} ]]; then
+# if [[ -n ${MASTER_NODE} ]] && [[ -z ${COSMOS_URI} ]] && [[ -z ${LONDON_IMAGE} ]]; then
+if [[ -n ${MASTER_NODE} ]] && [[ -z ${COSMOS_URI} ]]; then
   {{- if IsDockerContainerRuntime}}
   cli_tool="docker"
   {{else}}

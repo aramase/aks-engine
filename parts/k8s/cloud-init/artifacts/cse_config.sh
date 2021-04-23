@@ -140,6 +140,7 @@ configureLondon() {
     done
   fi
 
+  chown -R etcd:etcd /var/lib/etcddisk
   systemctlLondon || exit {{GetCSEErrorCode "ERR_ETCD_START_TIMEOUT"}}
 }
 
@@ -192,7 +193,7 @@ configureK8s() {
     chmod 0644 "${apiserver_crt}"
     chown root:root "${apiserver_crt}"
   fi
-  set +x
+  set -x
   echo "${KUBELET_PRIVATE_KEY}" | base64 --decode >"${client_key}"
   configureKubeletServerCert
   if [[ -n ${MASTER_NODE} ]]; then
