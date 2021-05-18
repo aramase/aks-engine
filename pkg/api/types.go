@@ -487,37 +487,38 @@ type CustomFile struct {
 
 // MasterProfile represents the definition of the master cluster
 type MasterProfile struct {
-	Count                     int               `json:"count"`
-	DNSPrefix                 string            `json:"dnsPrefix"`
-	SubjectAltNames           []string          `json:"subjectAltNames"`
-	VMSize                    string            `json:"vmSize"`
-	OSDiskSizeGB              int               `json:"osDiskSizeGB,omitempty"`
-	VnetSubnetID              string            `json:"vnetSubnetID,omitempty"`
-	VnetCidr                  string            `json:"vnetCidr,omitempty"`
-	AgentVnetSubnetID         string            `json:"agentVnetSubnetID,omitempty"`
-	FirstConsecutiveStaticIP  string            `json:"firstConsecutiveStaticIP,omitempty"`
-	Subnet                    string            `json:"subnet"`
-	SubnetIPv6                string            `json:"subnetIPv6"`
-	IPAddressCount            int               `json:"ipAddressCount,omitempty"`
-	StorageProfile            string            `json:"storageProfile,omitempty"`
-	HTTPSourceAddressPrefix   string            `json:"HTTPSourceAddressPrefix,omitempty"`
-	OAuthEnabled              bool              `json:"oauthEnabled"`
-	PreprovisionExtension     *Extension        `json:"preProvisionExtension"`
-	Extensions                []Extension       `json:"extensions"`
-	Distro                    Distro            `json:"distro,omitempty"`
-	KubernetesConfig          *KubernetesConfig `json:"kubernetesConfig,omitempty"`
-	ImageRef                  *ImageReference   `json:"imageReference,omitempty"`
-	CustomFiles               *[]CustomFile     `json:"customFiles,omitempty"`
-	AvailabilityProfile       string            `json:"availabilityProfile"`
-	PlatformFaultDomainCount  *int              `json:"platformFaultDomainCount"`
-	PlatformUpdateDomainCount *int              `json:"platformUpdateDomainCount"`
-	AgentSubnet               string            `json:"agentSubnet,omitempty"`
-	AvailabilityZones         []string          `json:"availabilityZones,omitempty"`
-	SinglePlacementGroup      *bool             `json:"singlePlacementGroup,omitempty"`
-	AuditDEnabled             *bool             `json:"auditDEnabled,omitempty"`
-	UltraSSDEnabled           *bool             `json:"ultraSSDEnabled,omitempty"`
-	EncryptionAtHost          *bool             `json:"encryptionAtHost,omitempty"`
-	CustomVMTags              map[string]string `json:"customVMTags,omitempty"`
+	Count                      int               `json:"count"`
+	DNSPrefix                  string            `json:"dnsPrefix"`
+	SubjectAltNames            []string          `json:"subjectAltNames"`
+	VMSize                     string            `json:"vmSize"`
+	OSDiskSizeGB               int               `json:"osDiskSizeGB,omitempty"`
+	VnetSubnetID               string            `json:"vnetSubnetID,omitempty"`
+	VnetCidr                   string            `json:"vnetCidr,omitempty"`
+	AgentVnetSubnetID          string            `json:"agentVnetSubnetID,omitempty"`
+	FirstConsecutiveStaticIP   string            `json:"firstConsecutiveStaticIP,omitempty"`
+	FirstConsecutiveStaticIPv6 string            `json:"firstConsecutiveStaticIPv6,omitempty"`
+	Subnet                     string            `json:"subnet"`
+	SubnetIPv6                 string            `json:"subnetIPv6"`
+	IPAddressCount             int               `json:"ipAddressCount,omitempty"`
+	StorageProfile             string            `json:"storageProfile,omitempty"`
+	HTTPSourceAddressPrefix    string            `json:"HTTPSourceAddressPrefix,omitempty"`
+	OAuthEnabled               bool              `json:"oauthEnabled"`
+	PreprovisionExtension      *Extension        `json:"preProvisionExtension"`
+	Extensions                 []Extension       `json:"extensions"`
+	Distro                     Distro            `json:"distro,omitempty"`
+	KubernetesConfig           *KubernetesConfig `json:"kubernetesConfig,omitempty"`
+	ImageRef                   *ImageReference   `json:"imageReference,omitempty"`
+	CustomFiles                *[]CustomFile     `json:"customFiles,omitempty"`
+	AvailabilityProfile        string            `json:"availabilityProfile"`
+	PlatformFaultDomainCount   *int              `json:"platformFaultDomainCount"`
+	PlatformUpdateDomainCount  *int              `json:"platformUpdateDomainCount"`
+	AgentSubnet                string            `json:"agentSubnet,omitempty"`
+	AvailabilityZones          []string          `json:"availabilityZones,omitempty"`
+	SinglePlacementGroup       *bool             `json:"singlePlacementGroup,omitempty"`
+	AuditDEnabled              *bool             `json:"auditDEnabled,omitempty"`
+	UltraSSDEnabled            *bool             `json:"ultraSSDEnabled,omitempty"`
+	EncryptionAtHost           *bool             `json:"encryptionAtHost,omitempty"`
+	CustomVMTags               map[string]string `json:"customVMTags,omitempty"`
 	// Master LB public endpoint/FQDN with port
 	// The format will be FQDN:2376
 	// Not used during PUT, returned as part of GET
@@ -1293,6 +1294,35 @@ func (m *MasterProfile) GetFirstConsecutiveStaticIPAddress(subnetStr string) str
 	_, subnet, err := net.ParseCIDR(subnetStr)
 	if err != nil {
 		return DefaultFirstConsecutiveKubernetesStaticIP
+	}
+
+	// Find the first and last octet of the host bits.
+	ones, bits := subnet.Mask.Size()
+	firstOctet := ones / 8
+	lastOctet := bits/8 - 1
+
+	if m.IsVirtualMachineScaleSets() {
+		subnet.IP[lastOctet] = DefaultKubernetesFirstConsecutiveStaticIPOffsetVMSS
+	} else {
+		// Set the remaining host bits in the first octet.
+		subnet.IP[firstOctet] |= (1 << byte((8 - (ones % 8)))) - 1
+
+		// Fill the intermediate octets with 1s and last octet with offset. This is done so to match
+		// the existing behavior of allocating static IP addresses from the last /24 of the subnet.
+		for i := firstOctet + 1; i < lastOctet; i++ {
+			subnet.IP[i] = 255
+		}
+		subnet.IP[lastOctet] = DefaultKubernetesFirstConsecutiveStaticIPOffset
+	}
+
+	return subnet.IP.String()
+}
+
+// GetFirstConsecutiveStaticIPv6Address returns the first static IPv6 IPx address of the given subnet.
+func (m *MasterProfile) GetFirstConsecutiveStaticIPv6Address(subnetStr string) string {
+	_, subnet, err := net.ParseCIDR(subnetStr)
+	if err != nil {
+		return DefaultFirstConsecutiveKubernetesStaticIPv6
 	}
 
 	// Find the first and last octet of the host bits.

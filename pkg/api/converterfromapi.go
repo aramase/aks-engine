@@ -482,6 +482,7 @@ func convertMasterProfileToVLabs(api *MasterProfile, vlabsProfile *vlabs.MasterP
 	vlabsProfile.VnetSubnetID = api.VnetSubnetID
 	vlabsProfile.AgentVnetSubnetID = api.AgentVnetSubnetID
 	vlabsProfile.FirstConsecutiveStaticIP = api.FirstConsecutiveStaticIP
+	vlabsProfile.FirstConsecutiveStaticIPv6 = api.FirstConsecutiveStaticIPv6
 	vlabsProfile.VnetCidr = api.VnetCidr
 	vlabsProfile.SetSubnet(api.Subnet)
 	vlabsProfile.SetSubnetIPv6(api.SubnetIPv6)

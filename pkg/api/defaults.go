@@ -514,15 +514,18 @@ func (cs *ContainerService) setOrchestratorDefaults(isUpgrade, isScale bool) {
 					if !isUpgrade || len(cs.Properties.MasterProfile.FirstConsecutiveStaticIP) == 0 {
 						if cs.Properties.MasterProfile.IsVirtualMachineScaleSets() {
 							cs.Properties.MasterProfile.FirstConsecutiveStaticIP = DefaultFirstConsecutiveKubernetesStaticIPVMSS
+							cs.Properties.MasterProfile.FirstConsecutiveStaticIPv6 = DefaultFirstConsecutiveKubernetesStaticIPv6
 							cs.Properties.MasterProfile.Subnet = DefaultKubernetesMasterSubnet
 							cs.Properties.MasterProfile.AgentSubnet = DefaultKubernetesAgentSubnetVMSS
 						} else {
 							cs.Properties.MasterProfile.FirstConsecutiveStaticIP = cs.Properties.MasterProfile.GetFirstConsecutiveStaticIPAddress(cs.Properties.MasterProfile.Subnet)
+							cs.Properties.MasterProfile.FirstConsecutiveStaticIPv6 = cs.Properties.MasterProfile.GetFirstConsecutiveStaticIPv6Address(cs.Properties.MasterProfile.SubnetIPv6)
 						}
 					}
 				} else {
 					cs.Properties.MasterProfile.Subnet = DefaultKubernetesMasterSubnet
 					cs.Properties.MasterProfile.SubnetIPv6 = DefaultKubernetesMasterSubnetIPv6
+					cs.Properties.MasterProfile.FirstConsecutiveStaticIPv6 = DefaultFirstConsecutiveKubernetesStaticIPv6
 					// FirstConsecutiveStaticIP is not reset if it is upgrade and some value already exists
 					if !isUpgrade || len(cs.Properties.MasterProfile.FirstConsecutiveStaticIP) == 0 {
 						if cs.Properties.MasterProfile.IsVirtualMachineScaleSets() {
@@ -941,13 +944,21 @@ func (cs *ContainerService) SetDefaultCerts(params DefaultCertParams) (bool, []n
 	masterExtraFQDNs := append(azureProdFQDNs, p.MasterProfile.SubjectAltNames...)
 	masterExtraFQDNs = append(masterExtraFQDNs, "localhost")
 	firstMasterIP := net.ParseIP(p.MasterProfile.FirstConsecutiveStaticIP).To4()
+	firstMasterIPv6 := net.ParseIP(p.MasterProfile.FirstConsecutiveStaticIPv6).To16()
 	localhostIP := net.ParseIP("127.0.0.1").To4()
+	enableIPv6 := cs.Properties.FeatureFlags.IsFeatureEnabled("EnableIPv6DualStack") || cs.Properties.FeatureFlags.IsFeatureEnabled("EnableIPv6Only")
 
 	if firstMasterIP == nil {
 		return false, nil, errors.Errorf("MasterProfile.FirstConsecutiveStaticIP '%s' is an invalid IP address", p.MasterProfile.FirstConsecutiveStaticIP)
 	}
+	if enableIPv6 && firstMasterIPv6 == nil {
+		return false, nil, errors.Errorf("MasterProfile.FirstConsecutiveStaticIPv6 '%s' is an invalid IP address", p.MasterProfile.FirstConsecutiveStaticIPv6)
+	}
 
 	ips := []net.IP{firstMasterIP, localhostIP}
+	if enableIPv6 {
+		ips = append(ips, firstMasterIPv6)
+	}
 
 	// Include the Internal load balancer as well
 	if p.MasterProfile.IsVirtualMachineScaleSets() {
@@ -1017,6 +1028,8 @@ func (cs *ContainerService) SetDefaultCerts(params DefaultCertParams) (bool, []n
 	pkiParams.ExtraIPs = ips
 	pkiParams.MasterCount = p.MasterProfile.Count
 	pkiParams.PkiKeySize = params.PkiKeySize
+	fmt.Println("cidrFirstIP ", cidrFirstIP)
+	fmt.Println("ips ", ips)
 	apiServerPair, clientPair, kubeConfigPair, etcdServerPair, etcdClientPair, etcdPeerPairs, err :=
 		helpers.CreatePki(pkiParams)
 	if err != nil {

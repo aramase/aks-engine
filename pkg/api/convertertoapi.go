@@ -517,6 +517,7 @@ func convertVLabsMasterProfile(vlabs *vlabs.MasterProfile, api *MasterProfile) {
 	api.VnetSubnetID = vlabs.VnetSubnetID
 	api.AgentVnetSubnetID = vlabs.AgentVnetSubnetID
 	api.FirstConsecutiveStaticIP = vlabs.FirstConsecutiveStaticIP
+	api.FirstConsecutiveStaticIPv6 = vlabs.FirstConsecutiveStaticIPv6
 	api.VnetCidr = vlabs.VnetCidr
 	api.Subnet = vlabs.GetSubnet()
 	api.SubnetIPv6 = vlabs.GetSubnetIPv6()

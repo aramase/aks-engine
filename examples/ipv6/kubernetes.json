@@ -44,7 +44,7 @@
             "ssh": {
                 "publicKeys": [
                     {
-                        "keyData": ""
+                        "keyData": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDKdBDnQq7XtiAfcQiyPbf8xRJh+xIjhf8vxje+Is1wXgQLzPdQx54eW42vR2G2mKsZLaQBuAk3uBn5vXtA8x+jaL3ZjZSZ3StwpluBeIPGhMyb46pAjgqmQsgeLFAVm4GR636w3CvpY0akREJJxwLxjTBKNL3GHxIP/EUSUDTUc0K7bEfECWm97NrOXsLBrz43DWWpXfEMU/Gt7zL0zLQvhCF574LOM00C8uGYl2t13bczG8ZV1shMcNnF756aNe1JcmXiwR3SVKSvWmEdNuDXtTTkgq6sJUEMUoG34peUAa8Ya6poQe/FFPIzldAlxsYm2Xou0+1OcK+1GxWSySbtGqAxPXBJXmZTLeHdkNpWqQTJyp5VbxAZMnx5GRZxUAa/Zo5O3yA+151tWr8ofgbaAi2WHWc0XvnwfIQUu2NlfXBulDgBPN75h/X97IQIqRi4zA478VK8YHK+6+G7DMAO9mMADAY/DxPwuI/tPds0jbG+dVMbb2euRSZyVnHHCSpCM+MMLs1mbvJBlgMc4txISoVTJq7/x/V8l6OZ+zTt2S2EzCND1lWNOBkt1DIfGgDNp5Q1sfbUDYJzZyk9USxrTqDxdppwzLdUvpWXyeOzLZtvLbeu9iklmDhmvFyWjCr3s/21UxXfFnzFlelTNgeXnKQQHGrm+3tLfuZFUAVzQQ== azureuser@linuxvm.com"
                     }
                 ]
             }

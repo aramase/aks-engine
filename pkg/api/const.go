@@ -62,6 +62,8 @@ const (
 	DefaultFirstConsecutiveKubernetesStaticIP = "10.240.255.5"
 	// DefaultFirstConsecutiveKubernetesStaticIPVMSS specifies the static IP address on Kubernetes master 0 of VMSS
 	DefaultFirstConsecutiveKubernetesStaticIPVMSS = "10.240.0.4"
+	// DefaultFirstConsecutiveKubernetesStaticIPv6 specifies the static IP address on Kubernetes master 0
+	DefaultFirstConsecutiveKubernetesStaticIPv6 = "2001:1234:5678:9abc::5"
 	//DefaultCNICIDR specifies the default value for
 	DefaultCNICIDR = "168.63.129.16/32"
 	// DefaultKubernetesFirstConsecutiveStaticIPOffset specifies the IP address offset of master 0
